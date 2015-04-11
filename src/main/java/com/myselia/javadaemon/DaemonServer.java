@@ -15,8 +15,9 @@ import com.myselia.javadaemon.extraction.DaemonComponentInfoExtract;
 
 public class DaemonServer implements Runnable, Addressable{
 	
-	public static int DaemonServer_BCAST = 42071;
-	public static int DaemonServer_INTERNAL = 42068;
+	public static int DaemonServer_BCAST = 42067;
+	public static int DaemonServer_INTERNAL_COMMUNICATE = 42066;
+	public static int Slave_Listen_Port = 42065;
 	
 	private boolean RUNNING = false;
 	private DaemonBroadcaster bcastHandle;
@@ -24,7 +25,6 @@ public class DaemonServer implements Runnable, Addressable{
 	private Socket clientConnectionSocket;
 	private Thread clientThread;
 	private Gson jsonParser;
-	
 	
 	private MailBox<Transmission> mb = new MailBox<Transmission>();
 	
@@ -49,7 +49,7 @@ public class DaemonServer implements Runnable, Addressable{
 	public void tick() {
 		try {
 			if (serverSocket == null) {
-				openServerSocket(DaemonServer_INTERNAL);
+				openServerSocket(DaemonServer_INTERNAL_COMMUNICATE);
 			}
 
 			while (RUNNING) {
@@ -129,7 +129,7 @@ public class DaemonServer implements Runnable, Addressable{
 								/*
 								 * PROCESSING GOES HERE!
 								 */
-								System.out.println("!PROCESSING!");
+								System.out.println("!PROCESSING CONNECTION WITH SANDBOX SLAVE!!!");
 							} else {
 								System.err.println("DEADSESSION!!!!!!!!!!!!!!!!!!!!");
 								clientConnectionSocket.close();

@@ -60,7 +60,7 @@ public class DaemonBroadcaster implements Runnable{
 					byte[] infoPacket = buildInfoPacket();
 					DatagramPacket networkPacket = new DatagramPacket(infoPacket, 
 							infoPacket.length, InetAddress.getByName("127.0.0.1"), 
-							DaemonServer.DaemonServer_BCAST);
+							DaemonServer.Slave_Listen_Port);
 					socket.send(networkPacket);
 					
 					Thread.sleep(BROADCAST_SLEEP);
@@ -112,7 +112,7 @@ public class DaemonBroadcaster implements Runnable{
 		String to = OpcodeAccessor.make(type, ActionType.SETUP, StemOperation.BROADCAST);
 		tb.newTransmission(from, to);
 		tb.addAtom("ip", "String", "127.0.0.1");
-		tb.addAtom("port", "int", Integer.toString(DaemonServer.DaemonServer_INTERNAL));
+		tb.addAtom("port", "int", Integer.toString(DaemonServer.DaemonServer_INTERNAL_COMMUNICATE));
 		tb.addAtom("type", "String", type.toString());
 		Transmission t = tb.getTransmission();
 
