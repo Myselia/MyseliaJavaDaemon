@@ -11,6 +11,12 @@ import com.google.gson.Gson;
 import com.mycelia.common.communication.Addressable;
 import com.mycelia.common.communication.structures.MailBox;
 import com.mycelia.common.communication.units.Transmission;
+import com.mycelia.common.communication.units.TransmissionBuilder;
+import com.mycelia.common.constants.opcode.ActionType;
+import com.mycelia.common.constants.opcode.ComponentType;
+import com.mycelia.common.constants.opcode.OpcodeAccessor;
+import com.mycelia.common.constants.opcode.operations.LensOperation;
+import com.mycelia.common.constants.opcode.operations.StemOperation;
 import com.myselia.javadaemon.extraction.DaemonComponentInfoExtract;
 
 public class DaemonServer implements Runnable, Addressable{
@@ -31,7 +37,7 @@ public class DaemonServer implements Runnable, Addressable{
 	public DaemonServer(DaemonBroadcaster bcast) throws IOException{
 		bcastHandle = bcast;
 		jsonParser = new Gson();
-		
+		RUNNING = true;
 	}
 
 	@Override
@@ -53,6 +59,7 @@ public class DaemonServer implements Runnable, Addressable{
 			}
 
 			while (RUNNING) {
+				System.out.println("RUNNING");
 				clientConnectionSocket = null;
 				try {
 					clientConnectionSocket = this.serverSocket.accept();
@@ -65,6 +72,7 @@ public class DaemonServer implements Runnable, Addressable{
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
 				clientThread = new Thread(new ClientSession(clientConnectionSocket));
+				clientThread.start();
 				bcastHandle.off();
 			}
 			
@@ -109,42 +117,53 @@ public class DaemonServer implements Runnable, Addressable{
 			output = new PrintWriter(clientConnectionSocket.getOutputStream(), true);
 		}
 		
-		@Override
 		public void run() {
-			while (RUNNING) {
-				if (CONNECTED) {
-					String inputS = "";
-					try {
-						if (!HANDSHAKEOK) {
-							// IP, TYPE, MAC, HASH
-							while ((inputS = input.readLine()) != null) {
-								System.out.println("RECV: " + inputS);
-								infoSet = handleSetupPacket(inputS);
-								HANDSHAKEOK = true;
-								break;
-							}
-						} else {
-
-							if (!output.checkError()) {
-								/*
-								 * PROCESSING GOES HERE!
-								 */
-								System.out.println("!PROCESSING CONNECTION WITH SANDBOX SLAVE!!!");
-							} else {
-								System.err.println("DEADSESSION!!!!!!!!!!!!!!!!!!!!");
-								clientConnectionSocket.close();
-								throw new IOException();
-							}
-						}
-
-					} catch (IOException e) {
-						System.err.println("Session at " + this.toString() + " has broken stream!");
-						e.printStackTrace();
-					}
+			try {
+				while (!Thread.currentThread().isInterrupted()) {
+					tick();
 				}
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 		}
 		
+		public void tick() {
+			while (RUNNING) {
+				String inputS = "";
+				try {
+					if (!HANDSHAKEOK) {
+						// IP, TYPE, MAC, HASH
+						System.out.println("WAITING FOR RESPONSE");
+						while ((inputS = input.readLine()) != null) {
+							System.out.println("RECV: " + inputS);
+							infoSet = handleSetupPacket(inputS);
+							HANDSHAKEOK = true;
+							System.out.println("HANDSHAKE OK!!!!! " + infoSet[0]);
+							break;
+						}
+					} else {
+
+						if (!output.checkError()) {
+							/*
+							 * PROCESSING GOES HERE!
+							 */
+							System.out.println("PROCESSING CLIENT!");
+							output.println(buildTestPacket());
+						} else {
+							System.err.println("DEADSESSION!!!!!!!!!!!!!!!!!!!!");
+							clientConnectionSocket.close();
+							throw new IOException();
+						}
+					}
+
+				} catch (IOException e) {
+					System.err.println("Session at " + this.toString() + " has broken stream!");
+					e.printStackTrace();
+				}
+
+			}
+		}
+
 		public void killThread() {
 			RUNNING = false;
 			try {
@@ -180,5 +199,17 @@ public class DaemonServer implements Runnable, Addressable{
 			
 			return infoSet;
 		}
+		
+		private String buildTestPacket() {
+			TransmissionBuilder tb = new TransmissionBuilder();
+			String from = OpcodeAccessor.make(ComponentType.STEM, ActionType.DATA, StemOperation.TEST);
+			String to = OpcodeAccessor.make(ComponentType.LENS, ActionType.DATA, LensOperation.TEST);
+			tb.newTransmission(from, to);
+			tb.addAtom("someNumber", "int", Integer.toString(5));
+			Transmission t = tb.getTransmission();
+			
+			return jsonParser.toJson(t, Transmission.class);
+		}
+		
 	}
 }

@@ -61,6 +61,7 @@ public class DaemonBroadcaster implements Runnable{
 					DatagramPacket networkPacket = new DatagramPacket(infoPacket, 
 							infoPacket.length, InetAddress.getByName("127.0.0.1"), 
 							DaemonServer.Slave_Listen_Port);
+					System.out.println("Sending: " + networkPacket.toString());
 					socket.send(networkPacket);
 					
 					Thread.sleep(BROADCAST_SLEEP);
