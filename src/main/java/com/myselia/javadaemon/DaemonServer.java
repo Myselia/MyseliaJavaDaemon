@@ -13,8 +13,8 @@ import com.mycelia.common.communication.units.Transmission;
 
 public class DaemonServer implements Runnable, Addressable{
 	
+	DaemonBroadcaster broadcaster = new DaemonBroadcaster();
 	private int portNumber = 42068;
-	
 	
 	private MailBox<Transmission> mb = new MailBox<Transmission>();
 	ServerSocket serverSocket = new ServerSocket(portNumber);
@@ -25,16 +25,11 @@ public class DaemonServer implements Runnable, Addressable{
 	BufferedReader in;
 
 	public DaemonServer() throws IOException{
-		super();
+		Thread broadcaster_thread = new Thread(broadcaster);
+		broadcaster_thread.start();
+		
 		
 	}
-	
-	
-	/*
-	 * 
-	 * (non-Javadoc)
-	 * @see java.lang.Runnable#run()
-	 */
 
 	@Override
 	public void run() {
@@ -50,7 +45,7 @@ public class DaemonServer implements Runnable, Addressable{
 	
 	public void tick(){
 		if(!CONNECTED){
-			seek();
+			seekOn();
 			connect();
 		} else {
 			//read incoming stream from the buffered reader
@@ -72,10 +67,16 @@ public class DaemonServer implements Runnable, Addressable{
 		} catch(Exception e) {
 			System.err.println("Error accepting client connections");
 		}
+		
+		seekOff();
 	}
 	
-	private void seek(){
-		//TODO:quick seek on localhost
+	private void seekOn(){
+		broadcaster.on();
+	}
+	
+	private void seekOff(){
+		broadcaster.off();
 	}
 
 	@Override
