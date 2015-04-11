@@ -71,7 +71,7 @@ public class DaemonServer implements Runnable, Addressable{
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ACCEPTING CONNECTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
-				clientThread = new Thread(new ClientSession(clientConnectionSocket));
+				clientThread = new Thread(new ClientSession(clientConnectionSocket, getMailBox()));
 				clientThread.start();
 				bcastHandle.off();
 			}
@@ -105,13 +105,16 @@ public class DaemonServer implements Runnable, Addressable{
 		PrintWriter output;
 		BufferedReader input;
 		Socket connection;
+		MailBox<Transmission> mb;
 		boolean RUNNING = true;
 		boolean CONNECTED = true;
 		boolean HANDSHAKEOK = false;
 		
 		String infoSet[];
 		
-		public ClientSession(Socket clientConnectionSocket) throws IOException {
+		public ClientSession(Socket clientConnectionSocket, MailBox<?> mb) throws IOException {
+			this.mb = (MailBox<Transmission>) mb;
+			System.out.println("MB IS::::::::::::::::::::::::::::::::"+mb);
 			connection = clientConnectionSocket;
 			input = new BufferedReader(new InputStreamReader(clientConnectionSocket.getInputStream()));
 			output = new PrintWriter(clientConnectionSocket.getOutputStream(), true);
@@ -129,26 +132,36 @@ public class DaemonServer implements Runnable, Addressable{
 		
 		public void tick() {
 			while (RUNNING) {
-				String inputS = "";
+				String inputToken = "";
 				try {
 					if (!HANDSHAKEOK) {
 						// IP, TYPE, MAC, HASH
 						System.out.println("WAITING FOR RESPONSE");
-						while ((inputS = input.readLine()) != null) {
-							System.out.println("RECV: " + inputS);
-							infoSet = handleSetupPacket(inputS);
+						while ((inputToken = input.readLine()) != null) {
+							System.out.println("RECV: " + inputToken);
+							infoSet = handleSetupPacket(inputToken);
 							HANDSHAKEOK = true;
 							System.out.println("HANDSHAKE OK!!!!! " + infoSet[0]);
 							break;
 						}
 					} else {
-
+						/*
+						 * ONCE THE HANDSHAKE IS DONE, ALL COMMUNICATION HANDLING HAPPENS HERE
+						 */
+						String outputToken = "";
 						if (!output.checkError()) {
-							/*
-							 * PROCESSING GOES HERE!
-							 */
-							System.out.println("PROCESSING CLIENT!");
-							output.println(buildTestPacket());
+							buildTestPacket();
+							if (input.ready()) {
+								if ((inputToken = input.readLine()) != null) {
+									mb.putInOutQueue(jsonParser.fromJson(inputToken, Transmission.class));
+									System.out.println("Received: " + mb.peekOutQueue());
+								}
+							}
+							if (mb.getInQueueSize() > 0) {
+								outputToken = jsonParser.toJson(mb.getFromInQueue());
+								System.out.println("Sending: " + outputToken);
+								output.println(outputToken);
+							} 
 						} else {
 							System.err.println("DEADSESSION!!!!!!!!!!!!!!!!!!!!");
 							clientConnectionSocket.close();
@@ -200,15 +213,14 @@ public class DaemonServer implements Runnable, Addressable{
 			return infoSet;
 		}
 		
-		private String buildTestPacket() {
+		private void buildTestPacket() {
 			TransmissionBuilder tb = new TransmissionBuilder();
 			String from = OpcodeAccessor.make(ComponentType.STEM, ActionType.DATA, StemOperation.TEST);
 			String to = OpcodeAccessor.make(ComponentType.LENS, ActionType.DATA, LensOperation.TEST);
 			tb.newTransmission(from, to);
 			tb.addAtom("someNumber", "int", Integer.toString(5));
 			Transmission t = tb.getTransmission();
-			
-			return jsonParser.toJson(t, Transmission.class);
+			mb.putInInQueue(t);
 		}
 		
 	}
