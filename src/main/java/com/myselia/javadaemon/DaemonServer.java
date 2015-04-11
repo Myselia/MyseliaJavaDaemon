@@ -97,8 +97,8 @@ public class DaemonServer implements Runnable, Addressable{
 		PrintWriter output;
 		BufferedReader input;
 		Socket connection;
-		boolean RUNNING = false;
-		boolean CONNECTED = false;
+		boolean RUNNING = true;
+		boolean CONNECTED = true;
 		boolean HANDSHAKEOK = false;
 		
 		String infoSet[];
