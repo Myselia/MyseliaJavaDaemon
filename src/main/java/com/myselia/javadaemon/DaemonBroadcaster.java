@@ -7,38 +7,36 @@ import java.net.InetAddress;
 import java.net.SocketException;
 
 import com.google.gson.Gson;
-import com.mycelia.common.communication.units.Transmission;
-import com.mycelia.common.communication.units.TransmissionBuilder;
-import com.mycelia.common.constants.opcode.ActionType;
-import com.mycelia.common.constants.opcode.ComponentType;
-import com.mycelia.common.constants.opcode.OpcodeAccessor;
-import com.mycelia.common.constants.opcode.operations.StemOperation;
+import com.myselia.javacommon.communication.units.Transmission;
+import com.myselia.javacommon.communication.units.TransmissionBuilder;
+import com.myselia.javacommon.constants.opcode.ActionType;
+import com.myselia.javacommon.constants.opcode.ComponentType;
+import com.myselia.javacommon.constants.opcode.OpcodeBroker;
+import com.myselia.javacommon.constants.opcode.operations.StemOperation;
 
-public class DaemonBroadcaster implements Runnable{
-	
+public class DaemonBroadcaster implements Runnable {
+
 	private boolean RUNNING = true;
 	private boolean SEEKING = false;
 	private int BROADCAST_SLEEP = 1500;
 	private DatagramSocket socket = null;
 	public ComponentType type;
-	
+
 	public DaemonBroadcaster(int port, ComponentType type) {
 		this.type = type;
 		try {
 			socket = new DatagramSocket(port);
-			System.out.println("Created broadcaster \n" 
-					+ "\t->Port: " + port 
-					+ "\n\t->Socket at: " + socket);
+			System.out.println("Created broadcaster \n" + "\t->Port: " + port + "\n\t->Socket at: " + socket);
 		} catch (SocketException e) {
 			e.printStackTrace();
 		}
 	}
-	
-	public void on(){
+
+	public void on() {
 		SEEKING = true;
 	}
-	
-	public void off(){
+
+	public void off() {
 		SEEKING = false;
 	}
 
@@ -58,12 +56,10 @@ public class DaemonBroadcaster implements Runnable{
 			try {
 				if (SEEKING) {
 					byte[] infoPacket = buildInfoPacket();
-					DatagramPacket networkPacket = new DatagramPacket(infoPacket, 
-							infoPacket.length, InetAddress.getByName("127.0.0.1"), 
-							DaemonServer.Slave_Listen_Port);
+					DatagramPacket networkPacket = new DatagramPacket(infoPacket, infoPacket.length, InetAddress.getByName("127.0.0.1"), DaemonServer.Slave_Listen_Port);
 					System.out.println("Sending: " + networkPacket.toString());
 					socket.send(networkPacket);
-					
+
 					Thread.sleep(BROADCAST_SLEEP);
 				}
 			} catch (IOException e) {
@@ -78,9 +74,11 @@ public class DaemonBroadcaster implements Runnable{
 	}
 
 	/**
-	 * Used to build the JSON that will be sent in the UDP seek packets that components
-	 * will interpret internally.
-	 * @return A packet to be sent by the seeker accepting a particular type of component connection
+	 * Used to build the JSON that will be sent in the UDP seek packets that
+	 * components will interpret internally.
+	 * 
+	 * @return A packet to be sent by the seeker accepting a particular type of
+	 *         component connection
 	 */
 	private byte[] buildInfoPacket() {
 		String seekPacketString = null;
@@ -102,15 +100,15 @@ public class DaemonBroadcaster implements Runnable{
 		default:
 			break;
 		}
-		
+
 		return seekPacketString.getBytes();
 	}
-	
+
 	private String seekPacket(ComponentType type) {
 		TransmissionBuilder tb = new TransmissionBuilder();
 		Gson g = new Gson();
-		String from = OpcodeAccessor.make(ComponentType.DAEMON, ActionType.SETUP, StemOperation.BROADCAST);
-		String to = OpcodeAccessor.make(type, ActionType.SETUP, StemOperation.BROADCAST);
+		String from = OpcodeBroker.make(ComponentType.DAEMON, null, ActionType.SETUP, StemOperation.BROADCAST);
+		String to = OpcodeBroker.make(type, null, ActionType.SETUP, StemOperation.BROADCAST);
 		tb.newTransmission(from, to);
 		tb.addAtom("ip", "String", "127.0.0.1");
 		tb.addAtom("port", "int", Integer.toString(DaemonServer.DaemonServer_INTERNAL_COMMUNICATE));

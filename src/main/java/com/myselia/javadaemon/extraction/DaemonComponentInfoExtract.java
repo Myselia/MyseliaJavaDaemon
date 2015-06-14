@@ -6,9 +6,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 
-import com.mycelia.common.communication.units.Atom;
-import com.mycelia.common.communication.units.Transmission;
-import com.mycelia.common.constants.opcode.ComponentType;
+import com.myselia.javacommon.communication.units.Atom;
+import com.myselia.javacommon.communication.units.Transmission;
+import com.myselia.javacommon.constants.opcode.ComponentType;
 
 public class DaemonComponentInfoExtract {
 

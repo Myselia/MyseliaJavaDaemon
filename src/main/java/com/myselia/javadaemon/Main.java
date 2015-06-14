@@ -1,13 +1,12 @@
 package com.myselia.javadaemon;
 
-import com.mycelia.common.communication.ComponentCommunicator;
-import com.mycelia.common.communication.MailService;
-import com.mycelia.common.communication.distributors.DistributorType;
-import com.mycelia.common.constants.opcode.ComponentType;
+import com.myselia.javacommon.communication.ComponentCommunicator;
+import com.myselia.javacommon.communication.mail.MailService;
+import com.myselia.javacommon.constants.opcode.ComponentType;
 
 public class Main {
 	
-	public static MailService ms = new MailService(DistributorType.FORWARDER, ComponentType.DAEMON);
+	public static MailService ms = new MailService(ComponentType.DAEMON);
 	public static ComponentCommunicator cc = new ComponentCommunicator(ComponentType.DAEMON);
 	public static DaemonServer ds;
 	public static DaemonBroadcaster bcast;
@@ -15,7 +14,7 @@ public class Main {
 	public static void main(String[] args) {
 		try{
 			bcast = new DaemonBroadcaster(DaemonServer.DaemonServer_BCAST, ComponentType.SANDBOXSLAVE);
-			ds = new DaemonServer(bcast);
+			ds = new DaemonServer(bcast, cc	);
 		}catch (Exception e){
 			System.err.println("Daemon Server initialization error");
 		}

@@ -8,18 +8,20 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 import com.google.gson.Gson;
-import com.mycelia.common.communication.Addressable;
-import com.mycelia.common.communication.structures.MailBox;
-import com.mycelia.common.communication.units.Transmission;
-import com.mycelia.common.communication.units.TransmissionBuilder;
-import com.mycelia.common.constants.opcode.ActionType;
-import com.mycelia.common.constants.opcode.ComponentType;
-import com.mycelia.common.constants.opcode.OpcodeAccessor;
-import com.mycelia.common.constants.opcode.operations.LensOperation;
-import com.mycelia.common.constants.opcode.operations.StemOperation;
+import com.myselia.javacommon.communication.ComponentCommunicator;
+import com.myselia.javacommon.communication.mail.Addressable;
+import com.myselia.javacommon.communication.mail.MailBox;
+import com.myselia.javacommon.communication.mail.MailService;
+import com.myselia.javacommon.communication.units.Transmission;
+import com.myselia.javacommon.communication.units.TransmissionBuilder;
+import com.myselia.javacommon.constants.opcode.ActionType;
+import com.myselia.javacommon.constants.opcode.ComponentType;
+import com.myselia.javacommon.constants.opcode.OpcodeBroker;
+import com.myselia.javacommon.constants.opcode.operations.LensOperation;
+import com.myselia.javacommon.constants.opcode.operations.StemOperation;
 import com.myselia.javadaemon.extraction.DaemonComponentInfoExtract;
 
-public class DaemonServer implements Runnable, Addressable{
+public class DaemonServer implements Runnable, Addressable {
 	
 	public static int DaemonServer_BCAST = 42067;
 	public static int DaemonServer_INTERNAL_COMMUNICATE = 42066;
@@ -31,10 +33,12 @@ public class DaemonServer implements Runnable, Addressable{
 	private Socket clientConnectionSocket;
 	private Thread clientThread;
 	private Gson jsonParser;
+	private ComponentCommunicator cc;
 	
 	private MailBox<Transmission> mb = new MailBox<Transmission>();
 	
-	public DaemonServer(DaemonBroadcaster bcast) throws IOException{
+	public DaemonServer(DaemonBroadcaster bcast, ComponentCommunicator cc) throws IOException{
+		this.cc = cc;
 		bcastHandle = bcast;
 		jsonParser = new Gson();
 		RUNNING = true;
@@ -71,7 +75,7 @@ public class DaemonServer implements Runnable, Addressable{
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ACCEPTING CONNECTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
-				clientThread = new Thread(new ClientSession(clientConnectionSocket, getMailBox()));
+				clientThread = new Thread(new ClientSession(this, clientConnectionSocket, mb));
 				clientThread.start();
 				bcastHandle.off();
 			}
@@ -80,6 +84,20 @@ public class DaemonServer implements Runnable, Addressable{
 			e.printStackTrace();
 		}
 
+	}
+	
+	@Override
+	public void in(Transmission trans) {
+		mb.enqueueIn(trans);
+	}
+	
+	@Override
+	public Transmission out(){
+		return mb.dequeueOut();
+	}
+	
+	public void send(Transmission t) {
+		cc.writeTrans(t);
 	}
 
 	private void openServerSocket(int port) {
@@ -93,11 +111,6 @@ public class DaemonServer implements Runnable, Addressable{
 		}
 	}
 
-	@Override
-	public MailBox<?> getMailBox() {
-		return mb;
-	}
-
 	/*
 	 * THINGS THAT ARE TO BE DONE WITH THE SANDBOX SLAVE ARE DONE HERE!
 	 */
@@ -109,11 +122,13 @@ public class DaemonServer implements Runnable, Addressable{
 		boolean RUNNING = true;
 		boolean CONNECTED = true;
 		boolean HANDSHAKEOK = false;
+		DaemonServer d;
 		
 		String infoSet[];
 		
-		public ClientSession(Socket clientConnectionSocket, MailBox<?> mb) throws IOException {
-			this.mb = (MailBox<Transmission>) mb;
+		public ClientSession(DaemonServer d, Socket clientConnectionSocket, MailBox<Transmission> mb) throws IOException {
+			this.mb = mb;
+			this.d = d;
 			System.out.println("MB IS::::::::::::::::::::::::::::::::"+mb);
 			connection = clientConnectionSocket;
 			input = new BufferedReader(new InputStreamReader(clientConnectionSocket.getInputStream()));
@@ -149,19 +164,19 @@ public class DaemonServer implements Runnable, Addressable{
 						 * ONCE THE HANDSHAKE IS DONE, ALL COMMUNICATION HANDLING HAPPENS HERE
 						 */
 						String outputToken = "";
-						if (!output.checkError()) {
-							buildTestPacket();
-							if (input.ready()) {
-								if ((inputToken = input.readLine()) != null) {
-									mb.putInOutQueue(jsonParser.fromJson(inputToken, Transmission.class));
-									System.out.println("Received: " + mb.peekOutQueue());
-								}
+						//Receive Packets
+						if (input.ready()) {
+							if ((inputToken = input.readLine()) != null) {
+								send(jsonParser.fromJson(inputToken, Transmission.class));
 							}
-							if (mb.getInQueueSize() > 0) {
-								outputToken = jsonParser.toJson(mb.getFromInQueue());
-								System.out.println("Sending: " + outputToken);
+						}
+
+						// Send Packets
+						if (!output.checkError()) {
+							if (mb.getOutSize() > 0) {
+								outputToken = jsonParser.toJson(mb.dequeueOut());
 								output.println(outputToken);
-							} 
+							}
 						} else {
 							System.err.println("DEADSESSION!!!!!!!!!!!!!!!!!!!!");
 							clientConnectionSocket.close();
@@ -213,15 +228,17 @@ public class DaemonServer implements Runnable, Addressable{
 			return infoSet;
 		}
 		
-		private void buildTestPacket() {
+		/*private void buildTestPacket() {
 			TransmissionBuilder tb = new TransmissionBuilder();
-			String from = OpcodeAccessor.make(ComponentType.STEM, ActionType.DATA, StemOperation.TEST);
-			String to = OpcodeAccessor.make(ComponentType.LENS, ActionType.DATA, LensOperation.TEST);
+			String from = OpcodeBroker.make(ComponentType.STEM, null, ActionType.DATA, StemOperation.TEST);
+			String to = OpcodeBroker.make(ComponentType.LENS, null, ActionType.DATA, LensOperation.TEST);
 			tb.newTransmission(from, to);
 			tb.addAtom("someNumber", "int", Integer.toString(5));
 			Transmission t = tb.getTransmission();
 			mb.putInInQueue(t);
-		}
+		}*/
 		
 	}
+
+	
 }
