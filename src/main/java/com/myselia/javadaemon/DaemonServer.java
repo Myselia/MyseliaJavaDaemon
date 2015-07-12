@@ -8,17 +8,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 
 import com.google.gson.Gson;
-import com.myselia.javacommon.communication.ComponentCommunicator;
 import com.myselia.javacommon.communication.mail.Addressable;
 import com.myselia.javacommon.communication.mail.MailBox;
 import com.myselia.javacommon.communication.mail.MailService;
 import com.myselia.javacommon.communication.units.Transmission;
-import com.myselia.javacommon.communication.units.TransmissionBuilder;
-import com.myselia.javacommon.constants.opcode.ActionType;
-import com.myselia.javacommon.constants.opcode.ComponentType;
-import com.myselia.javacommon.constants.opcode.OpcodeBroker;
-import com.myselia.javacommon.constants.opcode.operations.LensOperation;
-import com.myselia.javacommon.constants.opcode.operations.StemOperation;
 import com.myselia.javadaemon.extraction.DaemonComponentInfoExtract;
 
 public class DaemonServer implements Runnable, Addressable {
@@ -33,15 +26,23 @@ public class DaemonServer implements Runnable, Addressable {
 	private Socket clientConnectionSocket;
 	private Thread clientThread;
 	private Gson jsonParser;
-	private ComponentCommunicator cc;
 	
 	private MailBox<Transmission> mb = new MailBox<Transmission>();
 	
-	public DaemonServer(DaemonBroadcaster bcast, ComponentCommunicator cc) throws IOException{
-		this.cc = cc;
+	public DaemonServer(DaemonBroadcaster bcast) throws IOException{
 		bcastHandle = bcast;
 		jsonParser = new Gson();
 		RUNNING = true;
+	}
+	
+	@Override
+	public void in(Transmission trans) {
+		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public Transmission out() {
+		return mb.dequeueOut();
 	}
 
 	@Override
@@ -75,7 +76,7 @@ public class DaemonServer implements Runnable, Addressable {
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!ACCEPTING CONNECTION!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 				System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!--------------------!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 
-				clientThread = new Thread(new ClientSession(this, clientConnectionSocket, mb));
+				clientThread = new Thread(new ClientSession(this, clientConnectionSocket));
 				clientThread.start();
 				bcastHandle.off();
 			}
@@ -84,20 +85,6 @@ public class DaemonServer implements Runnable, Addressable {
 			e.printStackTrace();
 		}
 
-	}
-	
-	@Override
-	public void in(Transmission trans) {
-		mb.enqueueIn(trans);
-	}
-	
-	@Override
-	public Transmission out(){
-		return mb.dequeueOut();
-	}
-	
-	public void send(Transmission t) {
-		cc.writeTrans(t);
 	}
 
 	private void openServerSocket(int port) {
@@ -126,8 +113,8 @@ public class DaemonServer implements Runnable, Addressable {
 		
 		String infoSet[];
 		
-		public ClientSession(DaemonServer d, Socket clientConnectionSocket, MailBox<Transmission> mb) throws IOException {
-			this.mb = mb;
+		public ClientSession(DaemonServer d, Socket clientConnectionSocket) throws IOException {
+			this.mb = d.mb;
 			this.d = d;
 			System.out.println("MB IS::::::::::::::::::::::::::::::::"+mb);
 			connection = clientConnectionSocket;
@@ -167,14 +154,15 @@ public class DaemonServer implements Runnable, Addressable {
 						//Receive Packets
 						if (input.ready()) {
 							if ((inputToken = input.readLine()) != null) {
-								send(jsonParser.fromJson(inputToken, Transmission.class));
+								mb.enqueueOut(jsonParser.fromJson(inputToken, Transmission.class));
+								MailService.notify(d);
 							}
 						}
 
 						// Send Packets
 						if (!output.checkError()) {
-							if (mb.getOutSize() > 0) {
-								outputToken = jsonParser.toJson(mb.dequeueOut());
+							if (mb.getInSize() > 0) {
+								outputToken = jsonParser.toJson(mb.dequeueIn());
 								output.println(outputToken);
 							}
 						} else {
@@ -207,7 +195,7 @@ public class DaemonServer implements Runnable, Addressable {
 		
 		public void startConnection() {
 			CONNECTED = true;
-		}
+		} 
 		
 		private String[] handleSetupPacket(String s) {
 			String[] infoSet = null;
@@ -239,6 +227,4 @@ public class DaemonServer implements Runnable, Addressable {
 		}*/
 		
 	}
-
-	
 }

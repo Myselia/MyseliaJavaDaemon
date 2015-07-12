@@ -14,12 +14,12 @@ public class Main {
 	public static void main(String[] args) {
 		try{
 			bcast = new DaemonBroadcaster(DaemonServer.DaemonServer_BCAST, ComponentType.SANDBOXSLAVE);
-			ds = new DaemonServer(bcast, cc	);
+			ds = new DaemonServer(bcast);
 		}catch (Exception e){
 			System.err.println("Daemon Server initialization error");
 		}
 		
-		MailService.registerAddressable(cc);
+		MailService.register("DATA_RESULTCONTAINER", cc);
 		MailService.registerAddressable(ds);
 		
 		Thread ms_thread = new Thread(ms);
