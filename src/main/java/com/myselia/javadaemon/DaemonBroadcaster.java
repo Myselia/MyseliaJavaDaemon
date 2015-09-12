@@ -12,7 +12,8 @@ import com.myselia.javacommon.communication.units.TransmissionBuilder;
 import com.myselia.javacommon.constants.opcode.ActionType;
 import com.myselia.javacommon.constants.opcode.ComponentType;
 import com.myselia.javacommon.constants.opcode.OpcodeBroker;
-import com.myselia.javacommon.constants.opcode.operations.StemOperation;
+import com.myselia.javacommon.constants.opcode.operations.DaemonOperation;
+import com.myselia.javacommon.topology.ComponentCertificate;
 
 public class DaemonBroadcaster implements Runnable {
 
@@ -20,9 +21,11 @@ public class DaemonBroadcaster implements Runnable {
 	private boolean SEEKING = false;
 	private int BROADCAST_SLEEP = 1500;
 	private DatagramSocket socket = null;
+	private Gson jsonInterpreter;
 	public ComponentType type;
 
 	public DaemonBroadcaster(int port, ComponentType type) {
+		this.jsonInterpreter = new Gson();
 		this.type = type;
 		try {
 			socket = new DatagramSocket(port);
@@ -105,17 +108,17 @@ public class DaemonBroadcaster implements Runnable {
 	}
 
 	private String seekPacket(ComponentType type) {
+		ComponentCertificate daemonCert = DaemonServer.daemonCertificate;
 		TransmissionBuilder tb = new TransmissionBuilder();
-		Gson g = new Gson();
-		String from = OpcodeBroker.make(ComponentType.DAEMON, null, ActionType.SETUP, StemOperation.BROADCAST);
-		String to = OpcodeBroker.make(type, null, ActionType.SETUP, StemOperation.BROADCAST);
+		String from = OpcodeBroker.make(ComponentType.DAEMON, daemonCert.getUUID(), ActionType.SETUP, DaemonOperation.BROADCAST);
+		String to = OpcodeBroker.make(type, null, ActionType.SETUP, DaemonOperation.BROADCAST);
 		tb.newTransmission(from, to);
-		tb.addAtom("ip", "String", "127.0.0.1");
+		tb.addAtom("daemonCertificate", "componentCertificate", jsonInterpreter.toJson(daemonCert));
 		tb.addAtom("port", "int", Integer.toString(DaemonServer.DaemonServer_INTERNAL_COMMUNICATE));
-		tb.addAtom("type", "String", type.toString());
+		tb.addAtom("type", "String", type.name());
 		Transmission t = tb.getTransmission();
 
-		return g.toJson(t);
+		return jsonInterpreter.toJson(t);
 	}
 
 }
