@@ -3,7 +3,7 @@ package com.myselia.javadaemon;
 import java.io.IOException;
 
 import com.google.gson.Gson;
-import com.myselia.javacommon.communication.mail.Addressable;
+import com.myselia.javacommon.communication.ComponentCommunicator;
 import com.myselia.javacommon.communication.mail.MailBox;
 import com.myselia.javacommon.communication.mail.MailService;
 import com.myselia.javacommon.communication.units.Transmission;
@@ -16,7 +16,7 @@ public class DaemonServer {
 	public static int DaemonServer_INTERNAL_COMMUNICATE = 42066;
 	public static int Slave_Listen_Port = 42065;
 
-	public static MailService ms = new MailService(ComponentType.DAEMON);
+	public static MailService ms;
 	private static Gson jsonParser = new Gson();
 
 	public static ComponentCertificate daemonCertificate;
@@ -34,10 +34,10 @@ public class DaemonServer {
 		
 		//Start the slave endpoint (server)
 		this.slaveConnector = new SlaveEndpoint(DaemonServer_INTERNAL_COMMUNICATE);
-		
-		//Register the addressable
-		/* MailService.registerAddressable(this); */
-
+	
+		//Create the MailService
+		ms = new MailService(ComponentType.DAEMON, ComponentCommunicator.componentCertificate.getUUID());
+		 
 		// Start Mail Service
 		Thread ms_thread = new Thread(ms);
 		ms_thread.start();

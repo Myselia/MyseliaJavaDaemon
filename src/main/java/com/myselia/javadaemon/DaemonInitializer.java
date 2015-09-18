@@ -1,8 +1,5 @@
 package com.myselia.javadaemon;
 
-import com.myselia.javacommon.communication.codecs.StringToTransmissionDecoder;
-import com.myselia.javacommon.communication.codecs.TransmissionToStringEncoder;
-
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
@@ -11,6 +8,9 @@ import io.netty.handler.codec.Delimiters;
 import io.netty.handler.codec.string.StringDecoder;
 import io.netty.handler.codec.string.StringEncoder;
 import io.netty.util.CharsetUtil;
+
+import com.myselia.javacommon.communication.codecs.StringToTransmissionDecoder;
+import com.myselia.javacommon.communication.codecs.TransmissionToStringEncoder;
 
 public class DaemonInitializer extends ChannelInitializer<SocketChannel> {
 

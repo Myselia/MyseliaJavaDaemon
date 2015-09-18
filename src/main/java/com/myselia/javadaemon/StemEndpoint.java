@@ -25,6 +25,7 @@ public class StemEndpoint implements Addressable {
 		
 		MailService.registerAddressable(this);
 		MailService.register("DATA_RESULTCONTAINER", this);
+		MailService.register("CONFIG_TABLEBROADCAST", this);
 	}
 	
 	public ComponentCertificate getComponentCertificate() {

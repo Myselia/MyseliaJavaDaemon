@@ -2,34 +2,46 @@ package com.myselia.javadaemon;
 
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 
+import java.lang.reflect.Type;
 import java.util.Iterator;
+import java.util.Map;
 
-import javax.management.MBeanAttributeInfo;
-
-import com.myselia.javacommon.communication.codecs.StringToTransmissionDecoder;
-import com.myselia.javacommon.communication.codecs.TransmissionToStringEncoder;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.myselia.javacommon.communication.ComponentCommunicator;
 import com.myselia.javacommon.communication.mail.Addressable;
 import com.myselia.javacommon.communication.mail.MailBox;
 import com.myselia.javacommon.communication.mail.MailService;
 import com.myselia.javacommon.communication.units.Atom;
 import com.myselia.javacommon.communication.units.Transmission;
+import com.myselia.javacommon.communication.units.TransmissionBuilder;
+import com.myselia.javacommon.constants.opcode.ActionType;
+import com.myselia.javacommon.constants.opcode.ComponentType;
+import com.myselia.javacommon.constants.opcode.OpcodeBroker;
+import com.myselia.javacommon.constants.opcode.operations.DaemonOperation;
+import com.myselia.javacommon.constants.opcode.operations.LensOperation;
+import com.myselia.javacommon.constants.opcode.operations.StemOperation;
+import com.myselia.javacommon.topology.ComponentCertificate;
+import com.myselia.javacommon.topology.MyseliaRoutingTable;
+import com.myselia.javacommon.topology.MyseliaUUID;
 
 public class SlaveSession extends SimpleChannelInboundHandler<Transmission>
 		implements Addressable {
 
+	private static Gson jsonInterpreter = new Gson();
 	private Channel clientChannel;
 	private MailBox<Transmission> mailbox;
 	private boolean handshakeComplete = false;
+	private ComponentCertificate slaveCert;
 
 	public SlaveSession(Channel clientChannel) {
+		this.clientChannel = clientChannel;
 		this.mailbox = new MailBox<Transmission>();
 		MailService.registerAddressable(this);
-		this.clientChannel = clientChannel;
 	}
-
+	
 	@Override
 	protected void messageReceived(ChannelHandlerContext ctx, Transmission msg)
 			throws Exception {
@@ -44,16 +56,43 @@ public class SlaveSession extends SimpleChannelInboundHandler<Transmission>
 	private void handleSetupPacket(Transmission s) {
 		System.out.print("[HANDSHAKE BEGIN]");
 		try {
-			System.out.println("\t!!!!!!!!!!!!!!!RECV!!!!!!!!!!!!!!!!!!\n"
-					+ "\t|----> " + s);
 			printRecvMsg(s);
-
+			
+			//Get the certificate
+			extractCertificate(s);
+			
+			//Register into routing table
+			MyseliaUUID slaveUUID = slaveCert.getUUID();
+			MailService.routingTable.setNext(slaveUUID.toString(), slaveUUID.toString());
+			
+			notifyStem();
+			
 			handshakeComplete = true;
 		} catch (Exception e) {
 			System.out.println("\tSetup packet from component is malformed!");
 			e.printStackTrace();
 		}
 		System.out.println("[HANDSHAKE COMPLETE]");
+	}
+	
+	private void notifyStem() {
+		TransmissionBuilder tb = new TransmissionBuilder();
+		String from = OpcodeBroker.make(ComponentType.DAEMON, ComponentCommunicator.componentCertificate.getUUID(), ActionType.CONFIG, DaemonOperation.TABLEBROADCAST);
+		String to = OpcodeBroker.make(ComponentType.STEM, null, ActionType.CONFIG, StemOperation.TABLEBROADCAST);
+		tb.newTransmission(from, to);
+		tb.addAtom("routingTable", "MyseliaRoutingTable", jsonInterpreter
+				.toJson(MailService.routingTable,
+						MailService.routingTable.getClass()));
+		Transmission t = tb.getTransmission();
+		
+		in(t);
+	}
+	
+	private void extractCertificate(Transmission s) {
+		Iterator<Atom> it = s.get_atoms().iterator();
+		Atom a = it.next();
+		String atomValue = a.get_value();
+		slaveCert = jsonInterpreter.fromJson(atomValue, ComponentCertificate.class);
 	}
 
 	private void printRecvMsg(Transmission t) {
