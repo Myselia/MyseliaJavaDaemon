@@ -14,6 +14,7 @@ public class Main {
 					ComponentType.SANDBOXSLAVE);
 			ds = new DaemonServer(bcast);
 		} catch (Exception e) {
+			e.printStackTrace();
 			System.err.println("Daemon Server initialization error");
 		}
 
