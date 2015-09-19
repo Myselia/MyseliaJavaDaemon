@@ -58,10 +58,10 @@ public class SlaveSession extends SimpleChannelInboundHandler<Transmission>
 			MyseliaUUID slaveUUID = slaveCert.getUUID();
 			MailService.routingTable.setNext(slaveUUID.toString(), slaveUUID.toString());
 			
+			handshakeComplete = true;
+			
 			//Report the routing table to the stem on creation
 			in(ComponentCommunicator.routingTableUpdateTransmission());
-			
-			handshakeComplete = true;
 		} catch (Exception e) {
 			System.out.println("\t[SlaveSession Error] : Setup packet from component is malformed!");
 			e.printStackTrace();

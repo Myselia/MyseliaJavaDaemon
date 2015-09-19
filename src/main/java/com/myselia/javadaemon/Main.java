@@ -8,7 +8,7 @@ public class Main {
 	public static DaemonBroadcaster bcast;
 
 	public static void main(String[] args) {
-
+		System.setProperty("java.net.preferIPv4Stack" , "true");
 		try {
 			bcast = new DaemonBroadcaster(DaemonServer.DaemonServer_BCAST,
 					ComponentType.SANDBOXSLAVE);
